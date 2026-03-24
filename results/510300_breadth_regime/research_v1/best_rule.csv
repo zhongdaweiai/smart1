@@ -1,0 +1,2 @@
+flip_cap_q,bdiff_cap_q,trend_min,gap_q,n_preds,n_days,hit_rate,zero_rate,avg_signed_bps_gross,avg_signed_bps_net,median_signed_bps_net,nonzero_hit_rate,worst_day_net_bps,best_day_net_bps
+0.7,0.9,0.1,0.5,64.0,41.0,0.484375,0.515625,23.00258058031369,17.00258058031369,-6.0,1.0,-12.0,336.0804294982659

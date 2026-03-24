@@ -1,0 +1,30 @@
+{
+  "code": "510300.XSHG",
+  "horizon_min": 5,
+  "lookback_days": 120,
+  "params": {
+    "conf_q": 0.99,
+    "shock_q": 0.9,
+    "flip_q": 0.7,
+    "bdiff_q": 0.9,
+    "trend_min": 0.1,
+    "gap_q": 0.5
+  },
+  "summary": {
+    "n_preds": 59,
+    "n_days": 39,
+    "hit_rate": 0.5423728813559322,
+    "zero_rate": 0.3728813559322034,
+    "avg_signed_bps_gross": 17.916169676204884,
+    "avg_signed_bps_net": 11.916169676204886,
+    "median_signed_bps_net": 15.668480850902931,
+    "nonzero_hit_rate": 0.8648648648648649,
+    "worst_day_net_bps": -186.4256472784703,
+    "best_day_net_bps": 336.0804294982659
+  },
+  "artifacts": {
+    "chosen_thresholds_by_day": "/Users/daweizhong/Documents/projects/artifacts/breadth_confidence_510300_regime_fixedthreshold_v1/chosen_thresholds_by_day.csv",
+    "walkforward_trades": "/Users/daweizhong/Documents/projects/artifacts/breadth_confidence_510300_regime_fixedthreshold_v1/walkforward_trades.csv",
+    "walkforward_day_pnl": "/Users/daweizhong/Documents/projects/artifacts/breadth_confidence_510300_regime_fixedthreshold_v1/walkforward_day_pnl.csv"
+  }
+}

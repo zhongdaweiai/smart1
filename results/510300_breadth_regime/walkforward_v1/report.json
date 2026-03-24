@@ -1,0 +1,23 @@
+{
+  "code": "510300.XSHG",
+  "horizon_min": 5,
+  "lookback_days": 120,
+  "min_hist_trades": 20,
+  "summary": {
+    "n_preds": 141,
+    "n_days": 83,
+    "hit_rate": 0.48936170212765956,
+    "zero_rate": 0.44680851063829785,
+    "avg_signed_bps_gross": 14.712848201479934,
+    "avg_signed_bps_net": 8.712848201479934,
+    "median_signed_bps_net": -6.0,
+    "nonzero_hit_rate": 0.8846153846153846,
+    "worst_day_net_bps": -186.4256472784703,
+    "best_day_net_bps": 336.0804294982659
+  },
+  "artifacts": {
+    "chosen_params_by_day": "/Users/daweizhong/Documents/projects/artifacts/breadth_confidence_510300_regime_walkforward_v1/chosen_params_by_day.csv",
+    "walkforward_trades": "/Users/daweizhong/Documents/projects/artifacts/breadth_confidence_510300_regime_walkforward_v1/walkforward_trades.csv",
+    "walkforward_day_pnl": "/Users/daweizhong/Documents/projects/artifacts/breadth_confidence_510300_regime_walkforward_v1/walkforward_day_pnl.csv"
+  }
+}

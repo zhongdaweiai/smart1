@@ -1,0 +1,39 @@
+{
+  "code": "510300.XSHG",
+  "horizon_min": 5,
+  "base_rule": {
+    "description": "top1% confidence + breadth_align + minute_idx>=30 + shock_cap_q90 + long_only",
+    "n_preds": 281,
+    "n_days": 145,
+    "hit_rate": 0.4306049822064057,
+    "zero_rate": 0.5409252669039146,
+    "avg_signed_bps_gross": 14.33637473450746,
+    "avg_signed_bps_net": 8.33637473450746,
+    "median_signed_bps_net": -6.0,
+    "nonzero_hit_rate": 0.937984496124031,
+    "worst_day_net_bps": -80.3497848751809,
+    "best_day_net_bps": 336.0804294982659
+  },
+  "best_rule": {
+    "flip_cap_q": 0.7,
+    "bdiff_cap_q": 0.9,
+    "trend_min": 0.1,
+    "gap_q": 0.5,
+    "n_preds": 64.0,
+    "n_days": 41.0,
+    "hit_rate": 0.484375,
+    "zero_rate": 0.515625,
+    "avg_signed_bps_gross": 23.00258058031369,
+    "avg_signed_bps_net": 17.00258058031369,
+    "median_signed_bps_net": -6.0,
+    "nonzero_hit_rate": 1.0,
+    "worst_day_net_bps": -12.0,
+    "best_day_net_bps": 336.0804294982659
+  },
+  "artifacts": {
+    "rule_grid": "/Users/daweizhong/Documents/projects/artifacts/breadth_confidence_510300_regime_v1/rule_grid.csv",
+    "best_rule": "/Users/daweizhong/Documents/projects/artifacts/breadth_confidence_510300_regime_v1/best_rule.csv",
+    "best_rule_trades": "/Users/daweizhong/Documents/projects/artifacts/breadth_confidence_510300_regime_v1/best_rule_trades.csv",
+    "best_rule_day_pnl": "/Users/daweizhong/Documents/projects/artifacts/breadth_confidence_510300_regime_v1/best_rule_day_pnl.csv"
+  }
+}

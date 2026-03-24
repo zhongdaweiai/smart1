@@ -1,0 +1,37 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.coverage
+.venv/
+venv/
+
+# Large local datasets
+stock_data/
+ETF data/
+ETF data core7/
+ETF data 510300 continuous/
+ETF data 510300 2024Q4 proxy/
+fundamentals_data/
+data/
+
+# Large archives / notebooks / local outputs
+*.7z
+*.zip
+*.parquet
+*.feather
+*.ipynb_checkpoints/
+
+# Local agent / editor config
+.claude/
+.codex/
+
+# Research outputs that should stay local unless explicitly curated
+artifacts/
+
