@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: hs300-paper-trading
+    env: python
+    plan: free
+    rootDir: .
+    buildCommand: pip install -r paper_trading/requirements.txt
+    startCommand: gunicorn paper_trading.dashboard:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: PAPER_TRADING_DB
+        value: /var/data/paper_trading.db
+    disk:
+      name: paper-trading-data
+      mountPath: /var/data
+      sizeGB: 1
+
+  - type: cron
+    name: hs300-daily-replay
+    env: python
+    plan: free
+    rootDir: .
+    buildCommand: pip install -r paper_trading/requirements.txt
+    schedule: "30 7 * * 1-5"
+    startCommand: python paper_trading/live_signal_engine.py replay $(date -u -d 'today' +%F)
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: PAPER_TRADING_DB
+        value: /var/data/paper_trading.db
+    disk:
+      name: paper-trading-data
+      mountPath: /var/data
+      sizeGB: 1

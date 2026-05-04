@@ -1,0 +1,6 @@
+paper_trading.db
+paper_trading.db-journal
+paper_trading.db-wal
+paper_trading.db-shm
+_tmp/
+__pycache__/
