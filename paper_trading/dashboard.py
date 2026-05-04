@@ -30,6 +30,81 @@ DB_PATH = Path(os.environ.get("PAPER_TRADING_DB", REPO_ROOT / "paper_trading" / 
 app = Flask(__name__)
 
 
+def init_db_schema():
+    """Make sure the SQLite tables exist (idempotent). Runs once at module
+    import so the dashboard works on a clean Render persistent disk.
+
+    If DB does not exist and a boot seed (paper_trading/boot_db.sqlite)
+    is shipped in the repo, copy it to DB_PATH so the dashboard immediately
+    shows the 18 historical trades from 2025-12-01 to 2026-04-30. The
+    scheduler will append new days going forward."""
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    boot_seed = REPO_ROOT / "paper_trading" / "boot_db.sqlite"
+    if (not DB_PATH.exists()) and boot_seed.exists():
+        import shutil
+        shutil.copy(boot_seed, DB_PATH)
+        print(f"[dashboard] seeded {DB_PATH} from {boot_seed.name} (3.5 MB, 18 historical trades)")
+    schema = """
+    CREATE TABLE IF NOT EXISTS signals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts TEXT NOT NULL,
+        date TEXT NOT NULL,
+        minute_idx INTEGER,
+        state TEXT,
+        DirScore_5 REAL,
+        DirScore_10 REAL,
+        Exhaustion_10 REAL,
+        IPG_10 REAL,
+        Bucket_Penetration_10 REAL,
+        fired INTEGER NOT NULL,
+        skipped_reason TEXT,
+        fold_train_start TEXT,
+        fold_train_end TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_signals_date ON signals(date);
+    CREATE INDEX IF NOT EXISTS idx_signals_fired ON signals(fired);
+    CREATE TABLE IF NOT EXISTS trades (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        signal_id INTEGER,
+        date TEXT NOT NULL,
+        signal_ts TEXT NOT NULL,
+        entry_ts TEXT,
+        exit_ts TEXT,
+        entry_minute_idx INTEGER,
+        exit_minute_idx INTEGER,
+        side TEXT,
+        entry_px REAL,
+        exit_px REAL,
+        gross_bps REAL,
+        net_bps REAL,
+        hold_minutes INTEGER,
+        status TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(date);
+    CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status);
+    CREATE TABLE IF NOT EXISTS equity (
+        date TEXT PRIMARY KEY,
+        equity_close REAL,
+        daily_pnl REAL,
+        contracts INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS run_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts TEXT NOT NULL,
+        date TEXT,
+        mode TEXT,
+        message TEXT
+    );
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.executescript(schema)
+    conn.commit()
+    conn.close()
+
+
+init_db_schema()
+
+
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -356,10 +431,16 @@ def maybe_start_scheduler():
     market hours."""
     if os.environ.get("RUN_SCHEDULER", "0") in ("1", "true", "yes"):
         try:
+            import sys
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "research" / "strategy_lab"))
             from scheduler import start_in_background
             start_in_background(DB_PATH)
+            print(f"[dashboard] scheduler spawned, db={DB_PATH}")
         except Exception as exc:
+            import traceback
             print(f"[dashboard] failed to start scheduler: {exc}")
+            traceback.print_exc()
 
 
 # Start scheduler on import (so it works under gunicorn too)
