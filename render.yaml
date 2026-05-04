@@ -3,6 +3,13 @@
 #
 # Auto-discovered by Render at repo root. Connect this GitHub repo to
 # Render via Blueprint and the dashboard + scheduler are provisioned.
+#
+# Free tier: no persistent disk. SQLite lives in /tmp; on each cold
+# start the dashboard's init_db_schema() copies boot_db.sqlite over,
+# so the historical 18 trades are always shown. Live signals from the
+# scheduler are lost when the service spins down (free plan: 15 min
+# idle). To keep state across spin-downs, upgrade plan to "starter"
+# ($7/mo) and add a `disk:` block back.
 
 services:
   - type: web
@@ -17,10 +24,6 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: PAPER_TRADING_DB
-        value: /var/data/paper_trading.db
+        value: /tmp/paper_trading.db
       - key: RUN_SCHEDULER
         value: "1"
-    disk:
-      name: paper-trading-data
-      mountPath: /var/data
-      sizeGB: 1
