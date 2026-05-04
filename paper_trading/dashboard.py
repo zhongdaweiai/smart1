@@ -350,6 +350,22 @@ def index():
     return render_template_string(TEMPLATE)
 
 
+def maybe_start_scheduler():
+    """If RUN_SCHEDULER=1, spawn the akshare-driven background scheduler.
+    On Render this will be enabled to refresh signals every 5 min during
+    market hours."""
+    if os.environ.get("RUN_SCHEDULER", "0") in ("1", "true", "yes"):
+        try:
+            from scheduler import start_in_background
+            start_in_background(DB_PATH)
+        except Exception as exc:
+            print(f"[dashboard] failed to start scheduler: {exc}")
+
+
+# Start scheduler on import (so it works under gunicorn too)
+maybe_start_scheduler()
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
     app.run(host="0.0.0.0", port=port, debug=False)

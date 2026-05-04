@@ -1,0 +1,9 @@
+{
+  "train_start": "2025-11-03",
+  "train_end": "2026-04-30",
+  "exh10_max": 0.6993544964065856,
+  "ipg10_min": -0.004145227831829024,
+  "bp10_max": -0.09339622641509435,
+  "fitted_for_target_date": "2026-05-06",
+  "note": "Refit per-trading-day on Render once local panels are missing; this is the bootstrap value"
+}

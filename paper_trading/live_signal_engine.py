@@ -261,6 +261,36 @@ def derive_fold_thresholds(
     )
 
 
+def stream_live_day(
+    target_date: str,
+    history_cfg_feature: FeatureConfig,
+    live_cfg_feature: FeatureConfig,
+    live_cfg_multiproj: MultiprojConfig,
+    weights_by_date: dict,
+    weight_dates_sorted: list,
+    industry: pd.DataFrame,
+    fold: FoldThresholds,
+    conn: sqlite3.Connection,
+    history_dates: Optional[list] = None,
+    z_window_days: int = 20,
+):
+    """Live mode: history seeded from history_cfg (PROJECT_ROOT local),
+    today's day fetched via live_cfg (akshare overlay)."""
+    return _stream_internal(
+        target_date=target_date,
+        history_cfg_feature=history_cfg_feature,
+        target_cfg_feature=live_cfg_feature,
+        target_cfg_multiproj=live_cfg_multiproj,
+        weights_by_date=weights_by_date,
+        weight_dates_sorted=weight_dates_sorted,
+        industry=industry,
+        fold=fold,
+        conn=conn,
+        history_dates=history_dates,
+        z_window_days=z_window_days,
+    )
+
+
 def stream_one_day(
     target_date: str,
     cfg_feature: FeatureConfig,
@@ -273,14 +303,49 @@ def stream_one_day(
     history_dates: Optional[list] = None,
     z_window_days: int = 20,
 ):
+    """Replay/backfill mode: same cfg for history and target (local parquet)."""
+    return _stream_internal(
+        target_date=target_date,
+        history_cfg_feature=cfg_feature,
+        target_cfg_feature=cfg_feature,
+        target_cfg_multiproj=cfg_multiproj,
+        weights_by_date=weights_by_date,
+        weight_dates_sorted=weight_dates_sorted,
+        industry=industry,
+        fold=fold,
+        conn=conn,
+        history_dates=history_dates,
+        z_window_days=z_window_days,
+    )
+
+
+def _stream_internal(
+    target_date: str,
+    history_cfg_feature: FeatureConfig,
+    target_cfg_feature: FeatureConfig,
+    target_cfg_multiproj: MultiprojConfig,
+    weights_by_date: dict,
+    weight_dates_sorted: list,
+    industry: pd.DataFrame,
+    fold: FoldThresholds,
+    conn: sqlite3.Connection,
+    history_dates: Optional[list] = None,
+    z_window_days: int = 20,
+):
+    """Shared internal streaming loop. history_cfg can differ from target_cfg
+    so live mode can pull history from local parquet and target from akshare
+    overlay."""
+    # Use target_cfg as the "primary" cfg variable name for downstream code
+    cfg_feature = target_cfg_feature
+    cfg_multiproj = target_cfg_multiproj
     """Stream a single day minute-by-minute. Logs every minute as a signal
     row (with `fired=0` if rule did not pass), and inserts trades when
     the corresponding entry/exit minute arrives.
     """
     if history_dates is None:
         all_dates = list_trade_dates(
-            Path(cfg_feature.stock_data_dir),
-            Path(cfg_feature.etf_data_dir),
+            Path(history_cfg_feature.stock_data_dir),
+            Path(history_cfg_feature.etf_data_dir),
             "2024-01-01",
             target_date,
         )
@@ -298,8 +363,8 @@ def stream_one_day(
             skipped += 1
             continue
         try:
-            uni = make_universe(weights_by_date[wdt], industry, cfg_feature.leader_n, cfg_feature.weight_bins)
-            day = compute_day_features(d, uni, cfg_feature)
+            uni = make_universe(weights_by_date[wdt], industry, history_cfg_feature.leader_n, history_cfg_feature.weight_bins)
+            day = compute_day_features(d, uni, history_cfg_feature)
         except Exception:
             skipped += 1
             continue
@@ -491,6 +556,29 @@ def stream_one_day(
 # CLI
 # =============================================================================
 
+def fetch_via_akshare_into_overlay(target_date: str) -> tuple[Path, Path]:
+    """Fetch universe + ETF for target_date via akshare, save in local-format
+    parquet under paper_trading/akshare_overlay. Returns the overlay dirs.
+
+    Used by `live` and `live-once` modes to produce parquet that has the same
+    schema as PROJECT_ROOT/stock_data and PROJECT_ROOT/ETF data core7 precise.
+    """
+    from data_source_akshare import AkshareDataSource
+    overlay = REPO_ROOT / "paper_trading" / "akshare_overlay"
+    stock_dir = overlay / "stock"
+    etf_dir = overlay / "etf"
+    stock_dir.mkdir(parents=True, exist_ok=True)
+    etf_dir.mkdir(parents=True, exist_ok=True)
+    src = AkshareDataSource(REPO_ROOT / "paper_trading" / "akshare_cache")
+
+    universe = src.fetch_universe_bars(target_date=target_date)
+    universe.to_parquet(stock_dir / f"{target_date}.parquet", index=False)
+    etf = src.fetch_etf_bars(target_date=target_date)
+    etf.to_parquet(etf_dir / f"{target_date}.parquet", index=False)
+    print(f"[live] saved akshare overlay: stock={len(universe)} rows, etf={len(etf)} rows")
+    return stock_dir, etf_dir
+
+
 def main():
     parser = argparse.ArgumentParser(description="Live signal engine for HS300 V1.5 strategy")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -501,6 +589,10 @@ def main():
     p_backfill.add_argument("start", help="YYYY-MM-DD")
     p_backfill.add_argument("end", help="YYYY-MM-DD")
     p_backfill.add_argument("--db", default=str(DEFAULT_DB))
+    p_live = sub.add_parser("live-once", help="Fetch one date via akshare and stream-process. History from PROJECT_ROOT.")
+    p_live.add_argument("--target-date", default=None, help="YYYY-MM-DD; default = latest akshare trading date")
+    p_live.add_argument("--db", default=str(DEFAULT_DB))
+    p_live.add_argument("--reset-today", action="store_true", help="Delete existing rows for target_date before processing (idempotent re-run)")
     p_status = sub.add_parser("status", help="Show DB status")
     p_status.add_argument("--db", default=str(DEFAULT_DB))
     args = parser.parse_args()
@@ -539,6 +631,56 @@ def main():
             except Exception as exc:
                 print(f"[engine] {d} failed: {exc}")
                 log_run(conn, d, args.cmd, f"FAILED: {exc}")
+        conn.close()
+    elif args.cmd == "live-once":
+        # Resolve target_date (default = latest akshare trading day)
+        target_date = args.target_date
+        if target_date is None:
+            from data_source_akshare import AkshareDataSource
+            src = AkshareDataSource(REPO_ROOT / "paper_trading" / "akshare_cache")
+            target_date = src.latest_trading_date()
+            print(f"[live-once] target_date defaulted to akshare latest = {target_date}")
+        # Fetch akshare data and write to overlay dir
+        overlay_stock, overlay_etf = fetch_via_akshare_into_overlay(target_date)
+        # Build feature config that uses the overlay dir for THIS date and
+        # local PROJECT_ROOT for history
+        live_cfg_feature = FeatureConfig(
+            stock_data_dir=str(overlay_stock),
+            etf_data_dir=str(overlay_etf),
+            weights_csv="",
+            industry_map_path=cfg_feature.industry_map_path,
+            output_dir=cfg_feature.output_dir,
+            amount_min=100000.0,
+            min_active_constituents=120,
+        )
+        live_cfg_multiproj = MultiprojConfig(
+            stock_data_dir=str(overlay_stock),
+            etf_data_dir=str(overlay_etf),
+            industry_map_path=cfg_feature.industry_map_path,
+        )
+        # Build history from PROJECT_ROOT
+        all_dates = list_trade_dates(Path(cfg_feature.stock_data_dir), Path(cfg_feature.etf_data_dir), "2024-01-01", "2026-12-31")
+        history = sorted([h for h in all_dates if pd.Timestamp(h).normalize() < pd.Timestamp(target_date).normalize()])
+        # Init DB and optionally clean today's rows
+        conn = init_db(Path(args.db))
+        if args.reset_today:
+            conn.execute("DELETE FROM trades WHERE date=?", (target_date,))
+            conn.execute("DELETE FROM signals WHERE date=?", (target_date,))
+            conn.commit()
+            print(f"[live-once] reset today's rows for {target_date}")
+        # Patched stream_one_day: history uses cfg_feature (PROJECT_ROOT),
+        # target_date inside stream_one_day uses live_cfg_feature
+        try:
+            fold = derive_fold_thresholds(target_date, train_days=120)
+            stream_live_day(
+                target_date, cfg_feature, live_cfg_feature, live_cfg_multiproj,
+                weights_by_date, weight_dates_sorted, industry,
+                fold, conn, history_dates=history,
+            )
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            log_run(conn, target_date, "live-once", f"FAILED: {exc}")
         conn.close()
     elif args.cmd == "status":
         conn = init_db(Path(args.db))

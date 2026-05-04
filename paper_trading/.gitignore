@@ -4,3 +4,5 @@ paper_trading.db-wal
 paper_trading.db-shm
 _tmp/
 __pycache__/
+akshare_cache/
+akshare_overlay/

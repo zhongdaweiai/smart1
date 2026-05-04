@@ -67,6 +67,43 @@ Verified bit-exact against the batch walk-forward by
 `research/strategy_lab/streaming_lookahead_audit.py`. See
 `results/.../hs300_streaming_audit_v1/` for the reconciliation.
 
+## Live mode via akshare
+
+The engine's `live-once` subcommand fetches today's HS300 universe and
+510300 ETF minute bars from akshare (free, no auth) and streams them
+through the same signal pipeline as replay mode. Verified bit-aligned
+against the local backfill on 2026-04-28: same trade fires, +10.19 vs
++10.20 bps net. Akshare's ETF endpoint has a known bug (open=0 for all
+bars); the data adapter patches this by substituting the prior bar's
+close, which is the price at the start of the next bar in a continuous
+market.
+
+```bash
+# fetch + stream the latest available trading day
+python3 paper_trading/live_signal_engine.py live-once
+
+# or fetch a specific date
+python3 paper_trading/live_signal_engine.py live-once --target-date 2026-04-30 --reset-today
+```
+
+## Background scheduler
+
+For continuous paper-trading mode, `scheduler.py` spawns a daemon thread
+that runs the live cycle every 5 minutes during 09:30-15:00 Beijing time
+and every 30 minutes outside market hours. The dashboard auto-spawns
+this scheduler when started with `RUN_SCHEDULER=1`.
+
+```bash
+# run scheduler standalone
+python3 paper_trading/scheduler.py
+
+# or one cycle and exit
+python3 paper_trading/scheduler.py --once
+
+# integrated with dashboard (the Render-ready way):
+RUN_SCHEDULER=1 python3 paper_trading/dashboard.py
+```
+
 ## Deploying to Render
 
 Render is a cloud platform with a free tier sufficient for this
