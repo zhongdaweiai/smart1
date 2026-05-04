@@ -1,16 +1,17 @@
 # Render Blueprint for HS300 V1.5 Paper Trading
 # https://render.com/docs/blueprint-spec
 #
-# Auto-discovered by Render at repo root. Plan: starter ($7/mo) so a
+# Auto-discovered by Render at repo root. Plan: standard ($25/mo) so a
 # 1 GB persistent disk is mounted and SQLite state survives across
 # spin-downs and deploys. Live signals appended by the scheduler are
-# preserved across days.
+# preserved across days. Standard plan also gives 2 GB RAM and 1 vCPU
+# which is more than enough for the akshare 300-stock parallel fetch.
 
 services:
   - type: web
     name: hs300-paper-trading
     env: python
-    plan: starter
+    plan: standard
     rootDir: .
     buildCommand: pip install -r paper_trading/requirements.txt
     startCommand: gunicorn paper_trading.dashboard:app --bind 0.0.0.0:$PORT --workers 1 --timeout 180
