@@ -224,7 +224,27 @@ def derive_fold_thresholds(
 ) -> FoldThresholds:
     """Refit base + consensus thresholds using the last `train_days` trading
     days strictly before target_date. This mirrors the walk-forward logic.
+
+    On Render, where the V1 + multiproj panels are not present, we fall
+    back to fold_thresholds_seed.json (frozen thresholds fitted on
+    2025-11-03 to 2026-04-30 train window).
     """
+    seed_json = REPO_ROOT / "paper_trading" / "fold_thresholds_seed.json"
+    panel_path_v1 = REPO_ROOT / "results/510300_breadth_regime/hs300_phase1_5m_180d_precise_static_v1/scored_panel.parquet"
+
+    if not panel_path_v1.exists() and seed_json.exists():
+        # Render mode: load frozen thresholds
+        with open(seed_json) as f:
+            seed = json.load(f)
+        print(f"[engine] V1 panel missing; loading frozen fold thresholds from {seed_json.name}")
+        return FoldThresholds(
+            train_start=seed["train_start"],
+            train_end=seed["train_end"],
+            exh10_max=float(seed["exh10_max"]),
+            ipg10_min=float(seed["ipg10_min"]),
+            bp10_max=float(seed["bp10_max"]),
+        )
+
     from run_phase14_5_consensus_walkforward import (
         load_v1_panel,
         load_multiproj_panel,
@@ -343,17 +363,39 @@ def _stream_internal(
     the corresponding entry/exit minute arrives.
     """
     if history_dates is None:
-        all_dates = list_trade_dates(
-            Path(history_cfg_feature.stock_data_dir),
-            Path(history_cfg_feature.etf_data_dir),
-            "2024-01-01",
-            target_date,
-        )
-        history_dates = sorted([d for d in all_dates if pd.Timestamp(d).normalize() < pd.Timestamp(target_date).normalize()])
+        try:
+            all_dates = list_trade_dates(
+                Path(history_cfg_feature.stock_data_dir),
+                Path(history_cfg_feature.etf_data_dir),
+                "2024-01-01",
+                target_date,
+            )
+            history_dates = sorted([d for d in all_dates if pd.Timestamp(d).normalize() < pd.Timestamp(target_date).normalize()])
+        except Exception:
+            history_dates = []
 
     # Build z-deques from prior days
     raw_cols = [f"{name}_{h}_raw" for h in HORIZONS for name in RAW_NAMES]
     deques: dict = {col: defaultdict(lambda: deque(maxlen=z_window_days)) for col in raw_cols}
+
+    # Try seed-based bootstrap first (Render mode where local parquet is unavailable).
+    seed_path = REPO_ROOT / "paper_trading" / "zdeque_seed.parquet"
+    used_seed = False
+    if not history_dates and seed_path.exists():
+        print(f"[engine] no local history; bootstrapping z-deques from {seed_path.name}")
+        seed = pd.read_parquet(seed_path)
+        seed = seed.sort_values(["date", "minute_idx"]).reset_index(drop=True)
+        for col in raw_cols:
+            if col not in seed.columns:
+                continue
+            for (mi, val_series) in seed[["minute_idx", col]].groupby("minute_idx"):
+                vals = val_series[col].dropna().astype(float).tolist()
+                # Take the most recent up to z_window_days
+                for v in vals[-z_window_days:]:
+                    deques[col][int(mi)].append(v)
+        n_seed_days = seed["date"].nunique()
+        print(f"[engine] seeded {n_seed_days} prior days into z-deques")
+        used_seed = True
 
     print(f"[engine] populating z-deques from {min(z_window_days+5, len(history_dates))} prior days ...")
     skipped = 0
@@ -597,11 +639,17 @@ def main():
     p_status.add_argument("--db", default=str(DEFAULT_DB))
     args = parser.parse_args()
 
+    # On Render the project-root artifact is not present; fall back to the
+    # shipped copy under paper_trading/.
+    industry_map_local = PROJECT_ROOT / "artifacts/ashare_t1_xgb_stfree_mcap10_500_v2_fullrun/industry_map_baostock.parquet"
+    industry_map_shipped = REPO_ROOT / "paper_trading/industry_map_baostock.parquet"
+    industry_map_path = str(industry_map_local if industry_map_local.exists() else industry_map_shipped)
+
     cfg_feature = FeatureConfig(
         stock_data_dir=str(PROJECT_ROOT / "stock_data"),
         etf_data_dir=str(PROJECT_ROOT / "ETF data core7 precise"),
         weights_csv="",
-        industry_map_path=str(PROJECT_ROOT / "artifacts/ashare_t1_xgb_stfree_mcap10_500_v2_fullrun/industry_map_baostock.parquet"),
+        industry_map_path=industry_map_path,
         output_dir=str(REPO_ROOT / "paper_trading" / "_tmp"),
         amount_min=100000.0,
         min_active_constituents=120,
@@ -609,7 +657,7 @@ def main():
     cfg_multiproj = MultiprojConfig()
     weights_by_date = load_weight_table(str(REPO_ROOT / "research/strategy_lab/data/hs300_daily_weights/hs300_weights_2025-01-01_2026-04-30.csv"))
     weight_dates_sorted = sorted(weights_by_date.keys())
-    industry = load_industry_map(cfg_feature.industry_map_path)
+    industry = load_industry_map(industry_map_path)
 
     if args.cmd in ("replay", "backfill"):
         conn = init_db(Path(args.db))

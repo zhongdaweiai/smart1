@@ -102,11 +102,17 @@ def run_one_cycle(db_path: Path):
     # Fetch and overlay
     overlay_stock, overlay_etf = fetch_via_akshare_into_overlay(target_date)
 
+    # On Render the project-root artifact is not present; fall back to the
+    # shipped copy under paper_trading/.
+    industry_map_local = PROJECT_ROOT / "artifacts/ashare_t1_xgb_stfree_mcap10_500_v2_fullrun/industry_map_baostock.parquet"
+    industry_map_shipped = REPO_ROOT / "paper_trading/industry_map_baostock.parquet"
+    industry_map_path = str(industry_map_local if industry_map_local.exists() else industry_map_shipped)
+
     cfg_feature = FeatureConfig(
         stock_data_dir=str(PROJECT_ROOT / "stock_data"),
         etf_data_dir=str(PROJECT_ROOT / "ETF data core7 precise"),
         weights_csv="",
-        industry_map_path=str(PROJECT_ROOT / "artifacts/ashare_t1_xgb_stfree_mcap10_500_v2_fullrun/industry_map_baostock.parquet"),
+        industry_map_path=industry_map_path,
         output_dir=str(REPO_ROOT / "paper_trading" / "_tmp"),
         amount_min=100000.0,
         min_active_constituents=120,
