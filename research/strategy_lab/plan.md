@@ -10,6 +10,17 @@
 - Latest Explore: 13 (COMPLETED)
 - Key Insight: 🚨 测试了17种breadth信号变体×10种配置=160个组合，对真实HS300全部亏损。IC研究发现breadth_deficit有弱正IC(ICIR≈3-4)，但信号太弱(IC=0.017)无法覆盖交易成本
 
+## Structural Pivot
+- New framework document: [market_surface_wave_framework.md](./market_surface_wave_framework.md)
+- Research shift:
+  1. 从静态 breadth 水平，转向市场表面的速度、加速度、扩散和传导
+  2. 从单一全市场截面，转向 whole-market / index-weighted / sector 三层表面
+  3. 从"现在强不强"，转向"波是否正在形成、传导、未定价、未衰竭"
+- Immediate next experiments:
+  1. Surface kinematics: velocity / acceleration / wavefront expansion
+  2. Penetration: equal-weight wave -> weighted-core confirmation
+  3. Shape health: curvature / roughness / concentration / entropy
+
 ## Exploration Summary (Explore 01-06)
 - Explore 01-03: 发现breadth_resid是核心alpha，ICIR=2.08，尾盘最强
 - Explore 04: 基础策略OOS Sharpe 6.06
