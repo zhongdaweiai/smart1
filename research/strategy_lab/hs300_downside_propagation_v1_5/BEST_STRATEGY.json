@@ -1,0 +1,184 @@
+{
+  "name": "hs300_downside_propagation_v1_5_bp_filter",
+  "version": "1.5.0",
+  "created_at": "2026-05-04",
+  "supersedes_for_research": "hs300_downside_ipg0_v1",
+  "thesis": "EMERGING_DOWN propagation that has visibly reached the index core (Bucket_Penetration_10 negative beyond train q50) has stronger forward-30-min downside than EMERGING_DOWN alone. Wave Framework Sec. 6.4 (wave penetration) empirically confirmed: 5/5 V1 candidates improve on train when this filter is applied (avg lift +2.4 to +7.8 bps). Single-dim walk-forward: 16 trades, 75% win rate, +17.77 avg net bps, t=2.82.",
+  "market": "A-share",
+  "index": "000300.XSHG",
+  "execution_proxy": "510300.XSHG ETF returns mapped to IF futures",
+
+  "data_requirements": {
+    "stock_minute_dir": "/Users/daweizhong/Documents/projects/stock_data",
+    "etf_minute_dir_required": "/Users/daweizhong/Documents/projects/ETF data core7 precise",
+    "daily_weights_csv": "/Users/daweizhong/Documents/projects/smart1/research/strategy_lab/data/hs300_daily_weights/hs300_weights_2025-01-01_2026-04-30.csv",
+    "industry_map_path": "/Users/daweizhong/Documents/projects/artifacts/ashare_t1_xgb_stfree_mcap10_500_v2_fullrun/industry_map_baostock.parquet",
+    "do_not_use": "/Users/daweizhong/Documents/projects/ETF data core7",
+    "reason_not_use_old_etf_dir": "Old ETF files rounded ETF prices to 2 decimals and contaminate 5-minute returns."
+  },
+
+  "feature_pipeline": {
+    "phase_1_engine": "research/strategy_lab/run_hs300_phase1_5m_eval.py",
+    "phase_1_5_engine": "research/strategy_lab/compute_multiproj_features.py",
+    "horizons_minutes": [5, 10],
+    "z_score": {
+      "method": "robust per minute_idx bucket, median + 1.4826 * MAD",
+      "window_days": 20,
+      "min_history_days": 5,
+      "leak_check": "value appended to deque AFTER z is computed"
+    },
+    "raw_features": [
+      "B (breadth)", "dB (breadth velocity)", "Corr (cross-sectional sync)",
+      "EP (effective participation)", "TopK (top-K contribution)",
+      "SE (sector entropy)", "Dir (ETF direction strength)",
+      "WSB (weighted signed breadth)", "LFR (leader-follower)",
+      "WPS (weight-bucket participation slope)", "ETFRet (ETF return)"
+    ],
+    "composite_scores": {
+      "InternalPressure_h": "0.30*z_WSB + 0.20*z_dB + 0.20*z_Corr + 0.15*z_EP + 0.15*z_SE",
+      "IPG_h": "InternalPressure_h - z_ETFRet",
+      "PAD_h": "z_ETFRet - InternalPressure_h",
+      "GateScore_h": "0.22*z_B + 0.18*z_dB + 0.18*z_Corr + 0.14*z_EP + 0.12*z_SE + 0.08*z_Dir - 0.08*z_TopK",
+      "DirScore_h": "0.40*IPG + 0.30*z_LFR + 0.20*z_WPS + 0.10*z_WSB",
+      "Exhaustion_h": "0.50*max(PAD,0) + 0.30*max(z_TopK,0) + 0.20*max(-z_dB,0)"
+    },
+    "multiproj_features_added_in_v1_5": {
+      "Bucket_Top_Sign_h": "signed breadth in top weight-bucket (5 buckets by qcut on weight rank)",
+      "Bucket_Bottom_Sign_h": "signed breadth in bottom weight bucket",
+      "Bucket_Penetration_h": "Bucket_Top_Sign_h - Bucket_Bottom_Sign_h",
+      "Sector_Down_Frac_h": "fraction of active sectors with signed breadth < -0.10",
+      "EW_to_W_Penetration_h": "weighted - equal-weight signed breadth",
+      "WavefrontDown_Frac_5": "fraction of stocks newly turning sign>=0 to sign<0 at minute t"
+    }
+  },
+
+  "state_machine": {
+    "EMERGING_DOWN_definition": "Gate_5 == True AND DirScore_5 < -0.50 AND DirScore_10 < +0.45 AND Exhaustion_5 < 0.80",
+    "Gate_5_definition": "GateScore_5 > 0.60",
+    "Gate_10_definition": "GateScore_10 > 0.55"
+  },
+
+  "signal_rule": {
+    "side": "SHORT",
+    "all_conditions_required_at_minute_t": [
+      "state == 'EMERGING_DOWN'",
+      "minute_idx >= 30  (i.e. >= 10:00 from 09:30 open)",
+      "regular_time: HHMM in [935, 1450) excluding [1125, 1305]",
+      "DirScore_5 <= -0.75",
+      "DirScore_10 <= +0.45",
+      "Exhaustion_10 <= train_q90",
+      "IPG_10 >= train_q40",
+      "Bucket_Penetration_10 <= train_q50  (Phase 14.5)"
+    ],
+    "train_thresholds_initial_fit_2025_06_09_to_2026_03_05": {
+      "exhaustion_10_max": 0.6558249921746806,
+      "ipg_10_min": 0.0,
+      "bucket_penetration_10_max": -0.033333333333333326,
+      "n_train_eligible_rows": 73
+    },
+    "rule_for_walkforward": "thresholds refit on each fold's train slice; per-fold q-values may differ"
+  },
+
+  "execution": {
+    "entry": "next minute open (etf_open at minute t+1)",
+    "exit": "open at minute (t+1+hold_bars)",
+    "hold_bars": 30,
+    "max_trades_per_day": 2,
+    "overlap": false,
+    "round_trip_cost_bps": 4.5,
+    "stop_loss": "none",
+    "trailing_stop": "none",
+    "rationale_no_stop": "V1 stop/trailing grid showed stops cut large propagation winners early; Phase 14.5 inherits the no-stop rule."
+  },
+
+  "if_proxy": {
+    "initial_capital_cny": 500000,
+    "if_multiplier": 300,
+    "etf_to_index_scale": 1000,
+    "margin_rate": 0.08,
+    "capital_utilization": 0.8,
+    "integer_contracts": true,
+    "implied_effective_leverage_at_500k": "approx 8-10x"
+  },
+
+  "metrics": {
+    "all_use_static_panels_2025_06_09_to_2026_04_30": true,
+    "train_window": "2025-06-09 to 2026-03-05 (180 trading days)",
+    "oos_window": "2026-03-06 to 2026-04-30 (39 trading days)",
+    "train": {
+      "n_trades": 23,
+      "win_rate": 0.7826,
+      "avg_net_bps": 15.195,
+      "t_stat": 2.62,
+      "if_total_return": 0.3333,
+      "if_max_drawdown": -0.0447,
+      "if_sharpe": 2.764,
+      "if_calmar": 10.56
+    },
+    "oos": {
+      "n_trades": 7,
+      "win_rate": 0.7143,
+      "avg_net_bps": 14.106,
+      "t_stat": 1.46,
+      "warning": "below statistical significance",
+      "if_total_return": 0.0804,
+      "if_max_drawdown": -0.0051,
+      "if_sharpe": 2.629,
+      "if_calmar": 121.35
+    },
+    "walkforward_bp_only_4_folds_120_train_20_test": {
+      "n_trades": 16,
+      "win_rate": 0.75,
+      "avg_net_bps": 17.77,
+      "t_stat": 2.82,
+      "p_approx": 0.013,
+      "if_total_return_80_days": 0.2625,
+      "if_max_drawdown_80_days": -0.01664,
+      "if_sharpe_80_days": 3.68,
+      "if_calmar_80_days": 61.56,
+      "best_single_trade_bps": 63.15,
+      "worst_single_trade_bps": -17.38,
+      "best_single_day_pnl_cny": 49319,
+      "worst_single_day_pnl_cny": -9709,
+      "profit_concentration": "top 6 trades = 95.0% of total bps; the strategy is fat-tailed, not steady-grind"
+    },
+    "in_train_holdout_chunks": {
+      "chunk_B_2025_09_01_to_2025_11_28": {"n": 11, "win_rate": 0.818, "avg_net_bps": 16.53},
+      "chunk_C_2025_12_01_to_2026_03_05": {"n": 11, "win_rate": 0.727, "avg_net_bps": 11.40}
+    }
+  },
+
+  "robustness_audit": {
+    "look_ahead_audit": "passed; see results/.../hs300_phase14_5_audit_v1/README.md",
+    "v1_cherry_pick_check": "ipg0_oos_strong rule generalizes to 3 independent held-out windows (+12 to +17 bps each); rule itself is not pure cherry-pick despite suggestive name",
+    "bp_filter_general_lift_on_train": {
+      "score_selected": "+5.23 bps lift",
+      "ipg0_oos_strong": "+7.84 bps lift",
+      "ipg_m008_balanced": "+7.51 bps lift",
+      "ipg_q25_balanced": "+6.31 bps lift",
+      "base_exh90": "+2.35 bps lift",
+      "interpretation": "5/5 V1 candidates improve on train, ruling out cherry-pick artifact"
+    },
+    "bp_filter_oos_picture": "mixed; helps score_selected (+2.17), neutral-to-negative on cherry-picked candidates whose unfiltered OOS already absorbed the marginal alpha. Sample sizes 7-12 trades all p > 0.09."
+  },
+
+  "real_money_caveats": [
+    "OOS sample is 7 trades. Bootstrap-extrapolated annual return (median +122%) and worst-DD-of-year (median -2.2%) ASSUME the trade distribution holds; real regime shifts can produce 2-3x worse drawdown.",
+    "95% of the strategy's profit in the 16-trade walkforward came from 6 trades. A live month without a big-down day will look like a flat strategy and that is normal, not a failure mode. Do not abandon early.",
+    "All metrics use the precise ETF directory. The old rounded ETF directory will produce contaminated 5-minute returns.",
+    "Round-trip cost 4.5 bps is a research assumption; verify your real broker IF commission + slippage matches before scaling.",
+    "Same-day overnight is not held; max 2 trades/day; no holding across roll dates."
+  ],
+
+  "primary_artifacts": {
+    "phase_1_engine": "research/strategy_lab/run_hs300_phase1_5m_eval.py",
+    "phase_1_5_multiproj_engine": "research/strategy_lab/compute_multiproj_features.py",
+    "consensus_walkforward_runner": "research/strategy_lab/run_phase14_5_consensus_walkforward.py",
+    "robustness_audit_runner": "research/strategy_lab/audit_phase14_5_robustness.py",
+    "wave_framework_doc": "research/strategy_lab/market_surface_wave_framework.md",
+    "audit_results": "results/510300_breadth_regime/hs300_phase14_5_audit_v1/",
+    "consensus_results": "results/510300_breadth_regime/hs300_phase14_5_consensus_relaxed_v1/",
+    "v1_baseline_results": "results/510300_breadth_regime/hs300_downside_wf_static_precise_v1/",
+    "trade_log_walkforward": "results/510300_breadth_regime/hs300_phase14_5_audit_v1/bp_only_walkforward_trades.csv"
+  }
+}
