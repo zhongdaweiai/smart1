@@ -16,10 +16,56 @@
   1. 从静态 breadth 水平，转向市场表面的速度、加速度、扩散和传导
   2. 从单一全市场截面，转向 whole-market / index-weighted / sector 三层表面
   3. 从"现在强不强"，转向"波是否正在形成、传导、未定价、未衰竭"
-- Immediate next experiments:
-  1. Surface kinematics: velocity / acceleration / wavefront expansion
-  2. Penetration: equal-weight wave -> weighted-core confirmation
-  3. Shape health: curvature / roughness / concentration / entropy
+- Phase 14 已经在框架的 Layer C (penetration / projection lag) 落地为
+  HS300 downside propagation V1 (handoff 已 commit)。
+- Phase 14.5 在 V1 之上增加 multi-projection consensus 层。
+
+### Phase 14.5 — Wave Consensus (2026-05-04)
+- New code:
+  - [compute_multiproj_features.py](./compute_multiproj_features.py) —
+    sector / weight-bucket / equal-weight / wavefront cross-section
+    features. 219 days, 52,560 rows, 0 skipped, ~3 min build.
+    Sanity: WeightedSign_10 mean -0.0339 vs V1 WSB_10_raw -0.0326.
+  - [run_phase14_5_consensus_walkforward.py](./run_phase14_5_consensus_walkforward.py) —
+    six binary consensus dimensions, train-q-fit thresholds, level
+    sweep 0..6, single-dim ablations, fold walk-forward.
+- V1 baseline reproduced bit-exact (train/OOS/walkforward summary.json
+  identical to original handoff).
+- Headline result (consensus>=4 layered on V1 ipg0_oos_strong):
+  - Train: 21 trades, 57.1% win, +3.63 bps  (V1 base: 38, 65.8%, +7.36)
+  - OOS:   7 trades, 85.7% win, +19.89 bps (V1 base: 9, 77.8%, +17.44)
+  - Walk-forward (4 folds, 80 days, min_train_trades=14):
+    13 trades, 76.9% win, +16.12 bps, IF +20.1%, MaxDD -3.44%
+    (V1 fixed-rule: 20 trades, 70%, +15.22, IF +27.9%, MaxDD -5.93%)
+  - Half the trade count, sharper win rate (+7pp walkforward, +8pp OOS),
+    ~40% smaller IF MaxDD, Calmar 21.5 vs ~5.
+- Single-dim ablation winner is `cs_bucket_penetration`
+  (Bucket_Top_Sign_10 - Bucket_Bottom_Sign_10 below train q50). Alone:
+  - Train: 23 trades, **78.3% win, +15.19 bps** (vs V1 38/65.8%/+7.36)
+  - OOS:   7 trades, 71.4% win, +14.11 bps
+  - Empirical match for Wave Framework Sec. 6.4 wave-penetration
+    prediction on the same universe.
+- Result folder:
+  [hs300_phase14_5_consensus_relaxed_v1/README.md](../../results/510300_breadth_regime/hs300_phase14_5_consensus_relaxed_v1/README.md)
+- Open items:
+  1. Walk-forward for `cs_bucket_penetration` single-dim filter
+     (cleanest path -- single dim avoids consensus-AND scaling).
+  2. q-threshold sweep, especially asymmetric per-dim cuts.
+  3. UP mirror on EMERGING_UP for symmetry test.
+  4. Cross-index port (CSI500 / CSI1000) for universality.
+
+### Backlog from framework not yet built
+- Surface velocity / acceleration / jerk on the index-weighted breadth
+  (kinematics partially done -- IPG velocity is computed inline in
+  Phase 14.5 but breadth velocity / acceleration as standalone feature
+  family still missing).
+- Sector relay / wave speed (lead-lag between leader sector and
+  followers). Today only sector concord and sector down/up frac exist.
+- Behavioral flow family (signed turnover, follow flow, leader flow
+  relay). None of these have been built; they remain a separate file
+  under [market_surface_wave_framework.md](./market_surface_wave_framework.md)
+  Sec. 11.7.
+- Shape-health family (curvature, roughness) remains backlog.
 
 ## Exploration Summary (Explore 01-06)
 - Explore 01-03: 发现breadth_resid是核心alpha，ICIR=2.08，尾盘最强
