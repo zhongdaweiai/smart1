@@ -1,21 +1,16 @@
 # Render Blueprint for HS300 V1.5 Paper Trading
 # https://render.com/docs/blueprint-spec
 #
-# Auto-discovered by Render at repo root. Connect this GitHub repo to
-# Render via Blueprint and the dashboard + scheduler are provisioned.
-#
-# Free tier: no persistent disk. SQLite lives in /tmp; on each cold
-# start the dashboard's init_db_schema() copies boot_db.sqlite over,
-# so the historical 18 trades are always shown. Live signals from the
-# scheduler are lost when the service spins down (free plan: 15 min
-# idle). To keep state across spin-downs, upgrade plan to "starter"
-# ($7/mo) and add a `disk:` block back.
+# Auto-discovered by Render at repo root. Plan: starter ($7/mo) so a
+# 1 GB persistent disk is mounted and SQLite state survives across
+# spin-downs and deploys. Live signals appended by the scheduler are
+# preserved across days.
 
 services:
   - type: web
     name: hs300-paper-trading
     env: python
-    plan: free
+    plan: starter
     rootDir: .
     buildCommand: pip install -r paper_trading/requirements.txt
     startCommand: gunicorn paper_trading.dashboard:app --bind 0.0.0.0:$PORT --workers 1 --timeout 180
@@ -24,6 +19,10 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: PAPER_TRADING_DB
-        value: /tmp/paper_trading.db
+        value: /var/data/paper_trading.db
       - key: RUN_SCHEDULER
         value: "1"
+    disk:
+      name: paper-trading-data
+      mountPath: /var/data
+      sizeGB: 1
