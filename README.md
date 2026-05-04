@@ -23,6 +23,28 @@ Current focus:
 
 ## Current Best Clean Strategy
 
+The current best research line is the HS300 downside propagation strategy:
+
+- [HS300 Downside Propagation V1](research/strategy_lab/hs300_downside_propagation_v1/README.md)
+- [Agent Skill](research/strategy_lab/hs300_downside_propagation_v1/SKILL.md)
+- [Canonical Parameters](research/strategy_lab/hs300_downside_propagation_v1/BEST_STRATEGY.json)
+
+This strategy is short-only. It detects `EMERGING_DOWN` constituent
+propagation, requires `IPG_10` to show internal pressure still ahead of ETF
+price, and holds the short expression for about 30 minutes. It supersedes the
+older broad five-minute direction strategy, whose apparent edge was materially
+affected by ETF price precision issues.
+
+The current implementation is:
+
+- [run_hs300_downside_walkforward.py](research/strategy_lab/run_hs300_downside_walkforward.py)
+
+Curated result summaries are in:
+
+- [hs300_downside_wf_static_precise_v1](results/510300_breadth_regime/hs300_downside_wf_static_precise_v1/README.md)
+
+## Previous Clean Strategy
+
 The current reference strategy description is:
 
 - [510300_breadth_regime_strategy_spec.md](/Users/daweizhong/Documents/projects/smart1/research/strategy_lab/510300_breadth_regime_strategy_spec.md)

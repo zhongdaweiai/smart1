@@ -1,0 +1,85 @@
+{
+  "name": "hs300_downside_ipg0_v1",
+  "created_at": "2026-05-04",
+  "market": "A-share",
+  "index": "000300.XSHG",
+  "execution_proxy": "510300.XSHG ETF returns mapped to IF futures",
+  "thesis": "Emerging constituent-level downside propagation can lead ETF/IF price over a 30-minute horizon when internal pressure has not been fully reflected.",
+  "data_requirements": {
+    "stock_minute_dir": "/Users/daweizhong/Documents/projects/stock_data",
+    "etf_minute_dir_required": "/Users/daweizhong/Documents/projects/ETF data core7 precise",
+    "daily_weights_csv": "/Users/daweizhong/Documents/projects/smart1/research/strategy_lab/data/hs300_daily_weights/hs300_weights_2025-01-01_2026-04-30.csv",
+    "do_not_use": "/Users/daweizhong/Documents/projects/ETF data core7",
+    "reason_not_use_old_etf_dir": "Old ETF files rounded ETF prices to 2 decimals and contaminate 5-minute returns."
+  },
+  "signal_rule": {
+    "side": "SHORT",
+    "state": "EMERGING_DOWN",
+    "minimum_minute_idx": 30,
+    "dirscore_5_max": -0.75,
+    "dirscore_10_max": 0.45,
+    "exhaustion_10_threshold_source": "q90 on eligible training signals",
+    "exhaustion_10_threshold_value_for_2025_06_09_to_2026_03_05_train": 0.6558249921746806,
+    "ipg_10_threshold_source": "q40 on eligible training signals",
+    "ipg_10_threshold_value_for_2025_06_09_to_2026_03_05_train": 0.0,
+    "entry": "next minute open after signal bar",
+    "exit": "open after 30 bars",
+    "max_trades_per_day": 2,
+    "overlap": false,
+    "round_trip_cost_bps": 4.5,
+    "stop_loss": "none",
+    "trailing_stop": "none",
+    "reason_no_stop": "Stop/trailing grid reduced train and OOS performance by cutting large propagation moves early."
+  },
+  "if_proxy": {
+    "initial_capital_cny": 500000,
+    "if_multiplier": 300,
+    "etf_to_index_scale": 1000,
+    "margin_rate": 0.08,
+    "capital_utilization": 0.8,
+    "integer_contracts": true
+  },
+  "metrics": {
+    "train_2025_06_09_to_2026_03_05": {
+      "trades": 38,
+      "win_rate": 0.657895,
+      "avg_net_bps": 7.35892,
+      "if_ending_equity": 628527.910184,
+      "if_total_return": 0.257056,
+      "if_max_drawdown": -0.123391
+    },
+    "oos_2026_03_06_to_2026_04_30": {
+      "trades": 9,
+      "win_rate": 0.777778,
+      "avg_net_bps": 17.436716,
+      "if_ending_equity": 571814.628055,
+      "if_total_return": 0.143629,
+      "if_max_drawdown": -0.006396
+    },
+    "fixed_rule_rolling_80_trading_days": {
+      "trades": 20,
+      "win_rate": 0.7,
+      "avg_net_bps": 15.219082,
+      "if_ending_equity": 639529.033022,
+      "if_total_return": 0.279058,
+      "if_max_drawdown": -0.059338
+    },
+    "partial_2026_04_03_to_2026_04_30": {
+      "trades": 1,
+      "win_rate": 1.0,
+      "avg_net_bps": 10.19508,
+      "if_ending_equity": 504373.995084,
+      "if_total_return": 0.008748,
+      "if_max_drawdown": 0.0
+    }
+  },
+  "primary_artifacts": {
+    "code": "research/strategy_lab/run_hs300_downside_walkforward.py",
+    "feature_engine": "research/strategy_lab/run_hs300_phase1_5m_eval.py",
+    "handoff_readme": "research/strategy_lab/hs300_downside_propagation_v1/README.md",
+    "agent_skill": "research/strategy_lab/hs300_downside_propagation_v1/SKILL.md",
+    "shortlist_metrics": "results/510300_breadth_regime/hs300_downside_wf_static_precise_v1/candidate_shortlist_metrics.csv",
+    "fixed_rule_walkforward": "results/510300_breadth_regime/hs300_downside_wf_static_precise_v1/fixed_rule_walkforward_summary.csv",
+    "partial_latest_fold": "results/510300_breadth_regime/hs300_downside_wf_static_precise_v1/partial_20260403_0430_summary.csv"
+  }
+}
